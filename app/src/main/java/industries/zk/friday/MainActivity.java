@@ -2,10 +2,20 @@ package industries.zk.friday;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
+import android.Manifest;
+import android.bluetooth.BluetoothAdapter;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.drawable.Drawable;
+import android.net.ConnectivityManager;
 import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
@@ -14,6 +24,7 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
 import android.text.format.DateUtils;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -37,6 +48,8 @@ public class MainActivity extends AppCompatActivity {
     TextView mytext;
     BottomAppBar bottomAppBar;
     FloatingActionButton fab;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -44,6 +57,51 @@ public class MainActivity extends AppCompatActivity {
         bottomAppBar = (BottomAppBar) findViewById(R.id.bottomAppBar);
         fab = (FloatingActionButton) findViewById(R.id.floatActionBtn);
         mytext = (TextView) findViewById(R.id.textView);
+
+        //testing purpose
+
+
+        //check for the permissions
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+
+                // No explanation needed; request the permission
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.RECORD_AUDIO},1);
+
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADMIN)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            // No explanation needed; request the permission
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.BLUETOOTH_ADMIN},1);
+
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            // No explanation needed; request the permission
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.BLUETOOTH},1);
+
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CHANGE_WIFI_STATE)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            // No explanation needed; request the permission
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CHANGE_WIFI_STATE},1);
+
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_WIFI_STATE)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            // No explanation needed; request the permission
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_WIFI_STATE},1);
+
+        }
 
         fab.setOnClickListener(new View.OnClickListener(){
 
@@ -53,7 +111,11 @@ public class MainActivity extends AppCompatActivity {
                 intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                         RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
                 intent.putExtra( RecognizerIntent.EXTRA_MAX_RESULTS,1);
-                mySpeechRegonizer.startListening(intent);
+                if(!myTTS.isSpeaking()){
+                    mySpeechRegonizer.startListening(intent);
+                }
+
+
             }
         });
         setSupportActionBar(bottomAppBar);
@@ -96,9 +158,30 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onError(int error) {
-                    mytext.setText("Error Occured");
-                }
+                    if (error == 3) {
+                        mytext.setText("Audio Recording failed");
+                    }
+                    else if(error == 5){
+                        mytext.setText("Other Client Side Error");
+                    }
+                    else if (error == 9){
+                        mytext.setText("Insufficient Permissions");
+                        speak("Permissions are not Granted");
+                    }
+                    else if (error == 6){
+                        mytext.setText("Speech Timeout");
 
+                    }
+                    else if (error == 7){
+                        speak("Sorry, Not Recognized You Properly");
+                    }else if (error == 4){
+                        mytext.setText("Internet Connection..!");
+                        speak("Check Your Internet Connection");
+                    }
+                    else{
+                        mytext.setText("error "+error);
+                    }
+                }
                 @Override
                 public void onResults(Bundle bundle) {
 
@@ -113,7 +196,7 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onEvent(int eventType, Bundle params) {
-                    mytext.setText("Evetn");
+                    mytext.setText("Event");
                 }
             });
         }
@@ -123,21 +206,32 @@ public class MainActivity extends AppCompatActivity {
         command = command.toLowerCase();
 
         if (command.indexOf("open") != -1) {
-            if (command.indexOf("browser") != -1) {
-                Intent intent = new Intent(Intent.ACTION_VIEW,
-                        Uri.parse("https://www.google.com"));
-                startActivity(intent);
-                speak("Opening Browser...");
-            }
-            if (command.indexOf("instagram") != -1){
-                Intent intent = getPackageManager().getLaunchIntentForPackage("com.instagram.android");
-                startActivity(intent);
-            }
-            if (command.indexOf("whatsapp") != -1){
-                Intent intent = getPackageManager().getLaunchIntentForPackage("com.whatsapp");
-                startActivity(intent);
-            }
+            List<PackageInfo> packageList = getPackageManager().getInstalledPackages(0);
+            for (int i = 0; i < packageList.size(); i++){
+                PackageInfo packageInfo = packageList.get(i);
 
+                String appName = packageInfo.applicationInfo.loadLabel(getPackageManager()).toString().toLowerCase();
+                String packName = packageInfo.packageName;
+
+                String userAppName = command.substring(4,command.length());
+                userAppName = userAppName.trim().replace(" ","");
+                appName = appName.trim().replace(" ","");
+                packName = packName.trim();
+
+                if (userAppName.equals(appName)){
+                    Intent launchIntent = getPackageManager().getLaunchIntentForPackage(packName);
+                    speak("Opening "+appName+"....");
+                    startActivity(launchIntent);
+                    break;
+                }else{
+                    speak(userAppName+" is not installed in this device");
+                }
+            }
+        }
+        else if (command.indexOf("about") != -1) {
+            if (command.indexOf("you") != -1 || command.indexOf("your") != -1 || command.indexOf("yourself") != -1) {
+                speak("I am Voice Assistant ,You can Call me Friday, and, i am here to assist you ");
+            }
         }
         else if (command.indexOf("what") != -1) {
             if (command.indexOf("name") != -1) {
@@ -153,11 +247,8 @@ public class MainActivity extends AppCompatActivity {
                 String date = DateUtils.formatDateTime(this, now.getTime(), DateUtils.FORMAT_SHOW_YEAR);
                 speak("The Date Today is " + date);
             }
-        } else if (command.indexOf("about") != -1) {
-            if (command.indexOf("you") != -1 || command.indexOf("your") != -1 || command.indexOf("yourself") != -1) {
-                speak("I am Voice Assistant ,You can Call me Friday, and, i am developed by ZK ");
-            }
-        } else if (command.indexOf("search") != -1){
+        }
+        else if (command.indexOf("search") != -1){
             String query = command.substring(6,command.length());
             String squery = null;
             try {
@@ -169,7 +260,42 @@ public class MainActivity extends AppCompatActivity {
                     Uri.parse("https://www.google.com/search?q="+squery));
             startActivity(intent);
             speak("Taking You To Google...");
+        }else if(command.indexOf("locate")!= -1){
+            // Map point based on address
+            String sloc = command.substring(6,command.length());
+            Uri location = Uri.parse("geo:0,0?q="+sloc);
+
+            Intent mapIntent = new Intent(Intent.ACTION_VIEW, location);
+            startActivity(mapIntent);
+        }else if (command.indexOf("turn") != -1 || command.indexOf("switch") != -1){
+            if (command.indexOf("on") != -1){
+                if (command.indexOf("bluetooth") != -1){
+                    BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+                    bluetoothAdapter.enable();
+                    speak("Bluetooth turned on");
+                }
+                else if (command.indexOf("wi-fi") != -1){
+                    WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    wifiManager.setWifiEnabled(true);
+                    speak("WIFI turned on");
+                }
+            }else if(command.indexOf("off") != -1){
+                if (command.indexOf("bluetooth") != -1){
+                    BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+                    bluetoothAdapter.disable();
+                    speak("Bluetooth turned off");
+                }
+                else if(command.indexOf("wi-fi") != -1){
+                    WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    wifiManager.setWifiEnabled(false);
+                    speak("WIFI turned off");
+                }
+            }
         }
+        else {
+            speak("There is no command like :"+command);
+        }
+
     }
 
     private void initializeTextToSpeech() {
@@ -182,7 +308,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 else {
                     myTTS.setLanguage(Locale.UK);
-                    speak("Hello I'm Ready");
+                    speak("ready");
                 }
             }
         });
