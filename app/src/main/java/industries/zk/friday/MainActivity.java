@@ -256,8 +256,10 @@ public class MainActivity extends AppCompatActivity {
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
             }
-            Intent intent = new Intent(Intent.ACTION_VIEW,
-                    Uri.parse("https://www.google.com/search?q="+squery));
+            squery = "https://www.google.com/search?q="+squery;
+
+            Intent intent = new Intent(MainActivity.this,WebActivity.class);
+            intent.putExtra("query",squery);
             startActivity(intent);
             speak("Taking You To Google...");
         }else if(command.indexOf("locate")!= -1){
